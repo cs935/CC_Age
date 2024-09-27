@@ -1,0 +1,21 @@
+library(MCPcounter)
+library(dplyr)
+library(reshape2)
+library(ggpubr)
+
+genes <- data.table::fread("genes.txt",data.table = F) 
+probesets <- data.table::fread("probesets.txt",data.table = F,header = F) 
+MCPcounter_data <- read.csv("expdata.csv",header=T,row.names=1,stringsAsFactors = FALSE,check.names = F)
+results<- MCPcounter.estimate(MCPcounter_data, featuresType= "HUGO_symbols", probesets=probesets, genes=genes)
+cluster <- read.table("cluster.txt", header=T, check.names=F, row.names=1)
+data <- as.data.frame(t(results))
+sameSample <- intersect(row.names(data), row.names(cluster))
+data <- cbind(data[sameSample,,drop=F], cluster[sameSample,,drop=F])
+data$cluster <- factor(data$cluster, levels=c('young',"middle",'old'))
+data1 <- melt(data,id.vars=c("cluster"))
+colnames(data1) <- c("cluster", "celltype", "value")
+data1$value <- log2(data1$value+1)
+bioCol <- c("#00468B","#925E9F","#759EDD")
+ggboxplot(data1, x="celltype", y="value", fill="cluster", ylab="MCPcounter")+
+  stat_compare_means(aes(group=cluster),symnum.args=list(cutpoints=c(0, 0.001, 0.01, 0.05, 1), symbols=c("***", "**", "*", "ns")), 
+                     label="p.signif", method="kruskal.test")
